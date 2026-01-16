@@ -198,10 +198,6 @@ Common failure modes and where they occur:
 
 Integration tests use a local HTTPS server with mTLS.
 
-## License
-
-License: Apache-2.0. Third-party licenses are in `THIRD_PARTY_NOTICES.md` and any `third_party/*/LICENSE`.
-
 Dependencies:
 
 ```bash
@@ -264,7 +260,7 @@ ota-fetch/
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE), with third-party
+This project is licensed under the [Apache-2.0 License](LICENSE), with third-party
 components under their own terms.
 
-See `licenses/` for details (e.g., inih BSD 3-Clause).
+See `THIRD_PARTY_NOTICES.md` and `licenses/inih-BSD-3-Clause.txt` for details.

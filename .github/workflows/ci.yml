@@ -2,11 +2,25 @@ name: ota-fetch CI
 
 on:
   push:
+    branches:
+      - main
+      - master
   pull_request:
+  schedule:
+    - cron: "0 3 * * 1"
+
+# Read-only token to reduce blast radius
+permissions: read-all
+
+# Avoid wasting minutes on superseded runs
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-and-test:
     runs-on: ${{ matrix.os }}
+    if: ${{ github.event_name != 'schedule' }}
     strategy:
       fail-fast: false
       matrix:
@@ -15,7 +29,9 @@ jobs:
           - ubuntu-24.04
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - name: Install build dependencies
         run: |
@@ -51,3 +67,127 @@ jobs:
       - name: Run HTTP fetch test
         working-directory: test/scripts
         run: ./run-fetch-test.sh
+
+  license_scan:
+    runs-on: ubuntu-24.04
+    if: ${{ github.event_name == 'pull_request' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install ScanCode Toolkit
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install scancode-toolkit
+
+      - name: Run ScanCode
+        run: |
+          mkdir -p compliance
+          scancode \
+            --license \
+            --json-pp compliance/scancode.json \
+            --spdx-tv compliance/scancode.spdx.tv \
+            --ignore ".git/**" \
+            --ignore ".github/**" \
+            --ignore "build/**" \
+            --ignore "docs/html/**" \
+            --ignore "compliance/**" \
+            .
+
+      - name: Upload ScanCode reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: scancode-reports
+          path: |
+            compliance/scancode.json
+            compliance/scancode.spdx.tv
+          if-no-files-found: warn
+
+  deep_license_scan:
+    runs-on: ubuntu-24.04
+    if: ${{ github.event_name == 'schedule' }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install ScanCode Toolkit
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install scancode-toolkit
+
+      - name: Run ScanCode (deep)
+        run: |
+          mkdir -p compliance/deep
+          scancode \
+            --license \
+            --copyright \
+            --package \
+            --info \
+            --summary \
+            --json-pp compliance/deep/scancode.json \
+            --spdx-tv compliance/deep/scancode.spdx.tv \
+            --ignore ".git/**" \
+            --ignore ".github/**" \
+            --ignore "build/**" \
+            --ignore "docs/html/**" \
+            --ignore "compliance/**" \
+            .
+
+      - name: Upload deep ScanCode reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: scancode-reports-deep
+          path: |
+            compliance/deep/scancode.json
+            compliance/deep/scancode.spdx.tv
+          if-no-files-found: warn
+
+  code_similarity_scan:
+    runs-on: ubuntu-24.04
+    if: ${{ github.event_name == 'pull_request' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install jscpd
+        run: npm install -g jscpd@3.5.10 --no-audit --no-fund
+
+      - name: Run jscpd
+        run: |
+          mkdir -p compliance/jscpd
+          jscpd \
+            --reporters json \
+            --output compliance/jscpd \
+            --exitCode 0 \
+            src test
+
+      - name: Upload jscpd report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: jscpd-report
+          path: compliance/jscpd
+          if-no-files-found: warn
