@@ -1,0 +1,51 @@
+{
+  "manifest_version": "X.X.X-test",
+  "created": "2025-12-22T03:28:00Z",
+  "releases": [
+    {
+      "device_id": "default",
+      "release_name": "dev-test",
+      "release_version": "0.0.1-dev",
+      "created": "2025-12-22T03:28:00Z",
+      "files": [
+        {
+          "file_type": "rauc_bundle_test",
+          "filename": "h4-bundle.raucb",
+          "size": 689027501,
+          "sha256": "860b53ed6ea6a0cf602fae632cfcd28dbcf637f85a8bee28d2ee9c6cc9081669",
+          "path": "default/h4-bundle.raucb"
+        }
+      ]
+    },
+    {
+      "device_id": "h4-gw",
+      "release_name": "dev-test",
+      "release_version": "0.0.1-dev",
+      "created": "2025-12-22T03:28:00Z",
+      "files": [
+        {
+          "file_type": "rauc_bundle_test",
+          "filename": "h4-gw-bundle.raucb",
+          "size": 689027501,
+          "sha256": "860b53ed6ea6a0cf602fae632cfcd28dbcf637f85a8bee28d2ee9c6cc9081669",
+          "path": "h4-gw/h4-gw-bundle.raucb"
+        }
+      ]
+    },
+    {
+      "device_id": "h4-vision",
+      "release_name": "dev-test",
+      "release_version": "0.0.1-dev",
+      "created": "2025-12-22T04:39:06Z",
+      "files": [
+        {
+          "file_type": "rauc_bundle_test",
+          "filename": "h4-vision-bundle.raucb",
+          "size": 689027501,
+          "sha256": "860b53ed6ea6a0cf602fae632cfcd28dbcf637f85a8bee28d2ee9c6cc9081669",
+          "path": "h4-vision/h4-vision-bundle.raucb"
+        }
+      ]
+    }
+  ]
+}

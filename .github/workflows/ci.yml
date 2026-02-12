@@ -1,0 +1,112 @@
+name: ota-fetch CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+permissions: read-all
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build + CTest (${{ matrix.compiler }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler:
+          - gcc
+          - clang
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            gcc \
+            clang \
+            libcjson-dev \
+            libcurl4-openssl-dev \
+            libssl-dev
+
+      - name: Configure
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_COMPILER=${{ matrix.compiler }}
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Run CTest
+        run: ctest --test-dir build --output-on-failure
+
+  format-check:
+    name: clang-format
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Install clang-format
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format-18
+
+      - name: Check formatting
+        run: |
+          files=$(find tests -maxdepth 1 -type f \( -name '*.c' -o -name '*.h' \) | sort)
+          if [ -z "$files" ]; then
+            echo "No files to check."
+            exit 0
+          fi
+          echo "$files" | xargs clang-format-18 --dry-run --Werror
+
+  asan-ubsan:
+    name: ASan + UBSan
+    runs-on: ubuntu-24.04
+    env:
+      ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+      UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            clang-18 \
+            libcjson-dev \
+            libcurl4-openssl-dev \
+            libssl-dev
+
+      - name: Configure (sanitizers)
+        run: |
+          cmake -S . -B build-sanitize \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_COMPILER=clang-18 \
+            -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+
+      - name: Build (sanitizers)
+        run: cmake --build build-sanitize
+
+      - name: Run CTest (sanitizers)
+        run: ctest --test-dir build-sanitize --output-on-failure

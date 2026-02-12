@@ -1,0 +1,41 @@
+# Build artifacts
+/build/
+/build-*/
+/CMakeFiles/
+/CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# Test output
+/test/private/*
+/test/client/*
+/test/var/lib/ota_fetch/inbox/*
+/test/var/lib/ota_fetch/current/*
+/test/server/*.sig
+/test/server/*.crt
+/test/server/*.key
+!/test/private/.gitkeep
+!/test/client/.gitkeep
+!/test/var/lib/ota_fetch/inbox/.gitkeep
+!/test/var/lib/ota_fetch/current/.gitkeep
+/test/var/log/*.log
+
+#Docs
+/docs/*
+
+# Editor junk
+*.swp
+*.swo
+*.bak
+*~
+.vscode/*
+
+#Format Link
+.clang.format
+
+# Mac/Linux/Windows junk
+.DS_Store
+Thumbs.db
+
+fix_large_push.sh
+*.raucb

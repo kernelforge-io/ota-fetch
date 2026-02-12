@@ -1,0 +1,43 @@
+{
+  "manifest_version": "1.2.3-test",
+  "created": "2026-01-01T00:00:00Z",
+  "releases": [
+    {
+      "device_id": "default",
+      "release_name": "default-release",
+      "release_version": "1.2.3",
+      "created": "2026-01-01T00:00:00Z",
+      "files": [
+        {
+          "file_type": "rauc_bundle",
+          "filename": "default-bundle.raucb",
+          "size": 1024,
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "path": "default/default-bundle.raucb"
+        },
+        {
+          "file_type": "delta",
+          "filename": "default.delta",
+          "size": 128,
+          "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "path": "default/default.delta"
+        }
+      ]
+    },
+    {
+      "device_id": "h4-gw",
+      "release_name": "gw-release",
+      "release_version": "1.2.3",
+      "created": "2026-01-01T00:00:00Z",
+      "files": [
+        {
+          "file_type": "rauc_bundle",
+          "filename": "h4-gw-bundle.raucb",
+          "size": 2048,
+          "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "path": "h4-gw/h4-gw-bundle.raucb"
+        }
+      ]
+    }
+  ]
+}
