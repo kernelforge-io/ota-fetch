@@ -34,6 +34,8 @@ int config_handler(void *user, const char *section, const char *name,
 
 	if (MATCH("network", "server_url")) {
 		cfg->server_url = DUP(value);
+	} else if (MATCH("network", "enroll_url")) {
+		cfg->enroll_url = DUP(value);
 	} else if (MATCH("network", "tls_ca_cert")) {
 		cfg->tls_ca_cert = DUP(value);
 	} else if (MATCH("network", "tls_client_cert")) {
@@ -99,6 +101,7 @@ int config_load(const char *filename, struct ota_config *config) {
 /* ------------------------------------------------------------------------ */
 void config_free(struct ota_config *config) {
 	free(config->server_url);
+	free(config->enroll_url);
 	free(config->tls_ca_cert);
 	free(config->tls_client_cert);
 	free(config->tls_client_key);
@@ -114,6 +117,8 @@ void config_print(const struct ota_config *config) {
 	printf("Config:\n");
 	printf("server_url          = %s\n",
 	       config->server_url ? config->server_url : "(null)");
+	printf("enroll_url          = %s\n",
+	       config->enroll_url ? config->enroll_url : "(null)");
 	printf("tls_ca_cert             = %s\n",
 	       config->tls_ca_cert ? config->tls_ca_cert : "(null)");
 	printf("tls_client_cert         = %s\n",

@@ -30,6 +30,7 @@ endfunction()
 
 add_library(ota_fetch
     src/ota_fetch.c
+    src/enroll.c
     src/config.c
     src/ini.c
     src/manifest.c

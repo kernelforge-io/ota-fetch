@@ -35,6 +35,8 @@
 struct ota_config {
 	/**< OTA server base URL (e.g., "https://updates.example.com") */
 	char *server_url;
+	/**< Optional enrollment endpoint (defaults to server_url + "/enroll") */
+	char *enroll_url;
 	/**< Path to CA certificate for TLS validation */
 	char *tls_ca_cert;
 	/**< Path to client certificate for mTLS */

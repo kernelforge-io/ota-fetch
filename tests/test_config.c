@@ -14,6 +14,8 @@ int main(void) {
 	rc = config_load(config_path, &cfg);
 	TEST_ASSERT_INT_EQ(0, rc);
 	TEST_ASSERT_STR_EQ("https://updates.example.com", cfg.server_url);
+	TEST_ASSERT_STR_EQ("https://updates.example.com/enroll",
+			   cfg.enroll_url);
 	TEST_ASSERT_STR_EQ("/etc/ota_fetch/ca.pem", cfg.tls_ca_cert);
 	TEST_ASSERT_STR_EQ("/etc/ota_fetch/client.crt", cfg.tls_client_cert);
 	TEST_ASSERT_STR_EQ("/etc/ota_fetch/client.key", cfg.tls_client_key);
