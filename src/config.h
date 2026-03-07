@@ -21,7 +21,7 @@
  * @defgroup config Configuration
  * @brief INI configuration for OTA Fetcher.
  *
- * The default config path is `/etc/ota_fetch/ota_fetch.conf`. Keys are read
+ * The default config path is `/etc/ota-fetch/ota-fetch.conf`. Keys are read
  * from [network] and [system] sections.
  * @{
  */
@@ -70,7 +70,7 @@ struct ota_config {
 /**
  * @brief Load OTA config from file.
  *
- * Loads OTA configuration from a file (default: /etc/ota_fetch/ota_fetch.conf).
+ * Loads OTA configuration from a file (default: /etc/ota-fetch/ota-fetch.conf).
  *
  * @param filename Path to config file.
  * @param config   Pointer to ota_config struct to populate.

@@ -28,7 +28,7 @@ function(ota_fetch_apply_defaults target_name)
     endif()
 endfunction()
 
-add_library(ota_fetch
+add_library(ota_fetch_lib STATIC
     src/ota_fetch.c
     src/enroll.c
     src/config.c
@@ -39,7 +39,7 @@ add_library(ota_fetch
     src/logging.c
 )
 
-target_include_directories(ota_fetch
+target_include_directories(ota_fetch_lib
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/src
     PRIVATE
@@ -48,17 +48,17 @@ target_include_directories(ota_fetch
         ${OPENSSL_INCLUDE_DIRS}
 )
 
-target_link_libraries(ota_fetch
+target_link_libraries(ota_fetch_lib
     PRIVATE
         ${CURL_LIBRARIES}
         ${CJSON_LIBRARY}
         ${OPENSSL_LIBRARIES}
 )
 
-ota_fetch_apply_defaults(ota_fetch)
+ota_fetch_apply_defaults(ota_fetch_lib)
 
 add_executable(ota-fetch src/main.c)
-target_link_libraries(ota-fetch PRIVATE ota_fetch)
+target_link_libraries(ota-fetch PRIVATE ota_fetch_lib)
 ota_fetch_apply_defaults(ota-fetch)
 
 if(BUILD_TESTING)
