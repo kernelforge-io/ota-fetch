@@ -165,8 +165,10 @@ def stop_server(server, thread):
     thread.join(timeout=5)
 
 
-def run_success_case(ota_fetch_bin):
-    with tempfile.TemporaryDirectory(prefix="ota-fetch-enroll-success.") as tmp:
+def run_success_case(ota_fetch_bin, work_root=None):
+    with tempfile.TemporaryDirectory(
+        prefix="ota-fetch-enroll-success.", dir=work_root
+    ) as tmp:
         root = Path(tmp)
         etc_dir = root / "etc" / "ota-fetch"
         trust_dir = etc_dir / "trust"
@@ -233,8 +235,10 @@ def run_success_case(ota_fetch_bin):
             stop_server(server, thread)
 
 
-def run_refuse_existing_case(ota_fetch_bin):
-    with tempfile.TemporaryDirectory(prefix="ota-fetch-enroll-refuse.") as tmp:
+def run_refuse_existing_case(ota_fetch_bin, work_root=None):
+    with tempfile.TemporaryDirectory(
+        prefix="ota-fetch-enroll-refuse.", dir=work_root
+    ) as tmp:
         root = Path(tmp)
         etc_dir = root / "etc" / "ota-fetch"
         trust_dir = etc_dir / "trust"
@@ -295,8 +299,10 @@ def run_refuse_existing_case(ota_fetch_bin):
             stop_server(server, thread)
 
 
-def run_force_overwrite_case(ota_fetch_bin):
-    with tempfile.TemporaryDirectory(prefix="ota-fetch-enroll-force.") as tmp:
+def run_force_overwrite_case(ota_fetch_bin, work_root=None):
+    with tempfile.TemporaryDirectory(
+        prefix="ota-fetch-enroll-force.", dir=work_root
+    ) as tmp:
         root = Path(tmp)
         etc_dir = root / "etc" / "ota-fetch"
         trust_dir = etc_dir / "trust"
@@ -360,7 +366,16 @@ def run_force_overwrite_case(ota_fetch_bin):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--ota-fetch", required=True, help="Path to ota-fetch binary")
+    parser.add_argument(
+        "--ota-fetch",
+        dest="ota_fetch",
+        required=True,
+        help="Path to ota-fetch binary",
+    )
+    parser.add_argument(
+        "--work-root",
+        help="Optional directory under which to create per-test temporary state",
+    )
     parser.add_argument(
         "--case",
         required=True,
@@ -372,16 +387,21 @@ def main():
     )
     args = parser.parse_args()
 
-    ota_fetch_bin = str(Path(args.ota-fetch).resolve())
+    ota_fetch_bin = str(Path(args.ota_fetch).resolve())
     if not Path(ota_fetch_bin).exists():
         raise TestFailure(f"ota-fetch binary not found: {ota_fetch_bin}")
 
+    work_root = None
+    if args.work_root:
+        work_root = Path(args.work_root).resolve()
+        work_root.mkdir(parents=True, exist_ok=True)
+
     if args.case == "success":
-        run_success_case(ota_fetch_bin)
+        run_success_case(ota_fetch_bin, str(work_root) if work_root else None)
     elif args.case == "refuse_existing":
-        run_refuse_existing_case(ota_fetch_bin)
+        run_refuse_existing_case(ota_fetch_bin, str(work_root) if work_root else None)
     elif args.case == "force_overwrite":
-        run_force_overwrite_case(ota_fetch_bin)
+        run_force_overwrite_case(ota_fetch_bin, str(work_root) if work_root else None)
     else:
         raise TestFailure(f"unknown case: {args.case}")
 

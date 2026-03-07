@@ -22,6 +22,8 @@ add_ota_fetch_test(test_hash test_hash.c)
 
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
 set(ENROLL_CTEST_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/scripts/enroll_ctest.py")
+set(ENROLL_CTEST_WORK_DIR "${CMAKE_CURRENT_BINARY_DIR}/enroll_ctest")
+file(MAKE_DIRECTORY "${ENROLL_CTEST_WORK_DIR}")
 
 add_test(
     NAME enroll_success_writes_identity_and_deletes_token
@@ -29,6 +31,8 @@ add_test(
             ${ENROLL_CTEST_SCRIPT}
             --ota-fetch
             $<TARGET_FILE:ota-fetch>
+            --work-root
+            ${ENROLL_CTEST_WORK_DIR}
             --case
             success
 )
@@ -39,6 +43,8 @@ add_test(
             ${ENROLL_CTEST_SCRIPT}
             --ota-fetch
             $<TARGET_FILE:ota-fetch>
+            --work-root
+            ${ENROLL_CTEST_WORK_DIR}
             --case
             refuse_existing
 )
@@ -49,6 +55,8 @@ add_test(
             ${ENROLL_CTEST_SCRIPT}
             --ota-fetch
             $<TARGET_FILE:ota-fetch>
+            --work-root
+            ${ENROLL_CTEST_WORK_DIR}
             --case
             force_overwrite
 )
