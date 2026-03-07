@@ -48,7 +48,7 @@ Key modules in `src/`:
 
 - `main.c`: CLI parsing and startup.
 - `config.c`: INI config parsing and validation.
-- `ota_fetch.c`: fetch/verify/apply loop.
+- `ota-fetch.c`: fetch/verify/apply loop.
 - `manifest.c`: manifest parsing and selection.
 - `verify_libcrypto.c`: signature verification (OpenSSL).
 - `hash.c`: SHA-256 helpers.
@@ -96,11 +96,11 @@ determine whether an update is required.
 
 Configured directories (defaults shown):
 
-- `inbox_manifest_dir` (`/var/lib/ota_fetch/inbox`)
+- `inbox_manifest_dir` (`/var/lib/ota-fetch/inbox`)
   - Downloads `manifest.json`, `manifest.json.sig`, `signer.crt`, and the
     payload file (named by `files[0].filename`).
   - Temporary downloads use a `.tmp` suffix.
-- `current_manifest_dir` (`/var/lib/ota_fetch/current`)
+- `current_manifest_dir` (`/var/lib/ota-fetch/current`)
   - Stores the active `manifest.json` after a successful update.
 
 At the start of each run, the inbox directory is cleaned of old manifest files
@@ -128,7 +128,7 @@ cmake --build build
 
 ## Configuration
 
-Default path: `/etc/ota_fetch/ota_fetch.conf`
+Default path: `/etc/ota-fetch/ota-fetch.conf`
 
 Config is INI with `[network]` and `[system]` sections. Required keys are shown
 below.
@@ -136,19 +136,19 @@ below.
 ```ini
 [network]
 server_url = https://updates.example.com
-tls_ca_cert = /etc/ota_fetch/ca.pem
-tls_client_cert = /etc/ota_fetch/client.crt
-tls_client_key = /etc/ota_fetch/client.key
+tls_ca_cert = /etc/ota-fetch/ca.pem
+tls_client_cert = /etc/ota-fetch/client.crt
+tls_client_key = /etc/ota-fetch/client.key
 connect_timeout = 5
 transfer_timeout = 30
 retry_attempts = 3
 
 [system]
 update_interval_sec = 3600
-inbox_manifest_dir = /var/lib/ota_fetch/inbox
-current_manifest_dir = /var/lib/ota_fetch/current
-manifest_ca_cert = /etc/ota_fetch/root_ca.pem
-log_file = /var/log/ota_fetch.log
+inbox_manifest_dir = /var/lib/ota-fetch/inbox
+current_manifest_dir = /var/lib/ota-fetch/current
+manifest_ca_cert = /etc/ota-fetch/root_ca.pem
+log_file = /var/log/ota-fetch.log
 device_id = my-device-id
 ```
 
@@ -168,7 +168,7 @@ Key behavior:
 ```bash
 ./ota-fetch --oneshot
 ./ota-fetch --daemon
-./ota-fetch --config=/path/to/ota_fetch.conf
+./ota-fetch --config=/path/to/ota-fetch.conf
 ```
 
 ## RAUC integration

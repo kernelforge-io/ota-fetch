@@ -8,7 +8,7 @@ file(COPY "${TEST_DATA_SOURCE_DIR}/" DESTINATION "${TEST_DATA_BINARY_DIR}")
 
 function(add_ota_fetch_test test_name source_file)
     add_executable(${test_name} "${source_file}")
-    target_link_libraries(${test_name} PRIVATE ota_fetch)
+    target_link_libraries(${test_name} PRIVATE ota_fetch_lib)
     target_include_directories(${test_name} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
     target_compile_definitions(${test_name} PRIVATE
         TEST_DATA_DIR=\"${TEST_DATA_BINARY_DIR}\"

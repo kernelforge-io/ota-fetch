@@ -170,9 +170,9 @@ def run_success_case(ota_fetch_bin):
         root = Path(tmp)
         etc_dir = root / "etc" / "ota-fetch"
         trust_dir = etc_dir / "trust"
-        identity_dir = root / "var" / "lib" / "ota_fetch" / "identity"
-        inbox_dir = root / "var" / "lib" / "ota_fetch" / "inbox"
-        current_dir = root / "var" / "lib" / "ota_fetch" / "current"
+        identity_dir = root / "var" / "lib" / "ota-fetch" / "identity"
+        inbox_dir = root / "var" / "lib" / "ota-fetch" / "inbox"
+        current_dir = root / "var" / "lib" / "ota-fetch" / "current"
         token_path = identity_dir / "enroll.token"
         config_path = etc_dir / "ota-fetch.conf"
         key_path = identity_dir / "client.key"
@@ -238,9 +238,9 @@ def run_refuse_existing_case(ota_fetch_bin):
         root = Path(tmp)
         etc_dir = root / "etc" / "ota-fetch"
         trust_dir = etc_dir / "trust"
-        identity_dir = root / "var" / "lib" / "ota_fetch" / "identity"
-        inbox_dir = root / "var" / "lib" / "ota_fetch" / "inbox"
-        current_dir = root / "var" / "lib" / "ota_fetch" / "current"
+        identity_dir = root / "var" / "lib" / "ota-fetch" / "identity"
+        inbox_dir = root / "var" / "lib" / "ota-fetch" / "inbox"
+        current_dir = root / "var" / "lib" / "ota-fetch" / "current"
         token_path = identity_dir / "enroll.token"
         config_path = etc_dir / "ota-fetch.conf"
         key_path = identity_dir / "client.key"
@@ -300,9 +300,9 @@ def run_force_overwrite_case(ota_fetch_bin):
         root = Path(tmp)
         etc_dir = root / "etc" / "ota-fetch"
         trust_dir = etc_dir / "trust"
-        identity_dir = root / "var" / "lib" / "ota_fetch" / "identity"
-        inbox_dir = root / "var" / "lib" / "ota_fetch" / "inbox"
-        current_dir = root / "var" / "lib" / "ota_fetch" / "current"
+        identity_dir = root / "var" / "lib" / "ota-fetch" / "identity"
+        inbox_dir = root / "var" / "lib" / "ota-fetch" / "inbox"
+        current_dir = root / "var" / "lib" / "ota-fetch" / "current"
         token_path = identity_dir / "enroll.token"
         config_path = etc_dir / "ota-fetch.conf"
         key_path = identity_dir / "client.key"
@@ -372,7 +372,7 @@ def main():
     )
     args = parser.parse_args()
 
-    ota_fetch_bin = str(Path(args.ota_fetch).resolve())
+    ota_fetch_bin = str(Path(args.ota-fetch).resolve())
     if not Path(ota_fetch_bin).exists():
         raise TestFailure(f"ota-fetch binary not found: {ota_fetch_bin}")
 

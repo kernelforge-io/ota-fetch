@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2025-2026 KERNEL FORGE LLC
 /**
- * @file ota_fetch.h
+ * @file ota-fetch.h
  * @brief OTA Fetcher API for secure embedded update downloads.
  *
  * Declares the OTA fetch and update entry point for embedded Linux systems.
@@ -23,7 +23,7 @@
 #include <stdbool.h>
 
 /**
- * @defgroup ota_fetch OTA Fetch Loop
+ * @defgroup ota-fetch OTA Fetch Loop
  * @brief High-level OTA fetch and apply operation.
  * @{
  */

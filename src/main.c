@@ -128,8 +128,8 @@ static int parse_enroll_args(int argc, char *argv[], const char **config_path,
  * @return Exit code (0 on success, nonzero on error).
  */
 int main(int argc, char *argv[]) {
-	const char *config_path = "/etc/ota_fetch/ota_fetch.conf";
-	const char *token_file = "/var/lib/ota_fetch/identity/enroll.token";
+	const char *config_path = "/etc/ota-fetch/ota-fetch.conf";
+	const char *token_file = "/var/lib/ota-fetch/identity/enroll.token";
 	enum run_mode mode = MODE_ONESHOT;
 	enum command_mode command = CMD_FETCH;
 	bool force = false;

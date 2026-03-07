@@ -20,10 +20,10 @@ SERVER_ROOT="$RUN_DIR/server"
 PRIVATE_DIR="$RUN_DIR/private"
 CLIENT_DIR="$RUN_DIR/client"
 TRUST_DIR="$RUN_DIR/trust"
-INBOX_DIR="$RUN_DIR/var/lib/ota_fetch/inbox"
-CURRENT_DIR="$RUN_DIR/var/lib/ota_fetch/current"
+INBOX_DIR="$RUN_DIR/var/lib/ota-fetch/inbox"
+CURRENT_DIR="$RUN_DIR/var/lib/ota-fetch/current"
 LOG_DIR="$RUN_DIR/var/log"
-CONFIG_PATH="$RUN_DIR/etc/ota_fetch/ota_fetch.conf"
+CONFIG_PATH="$RUN_DIR/etc/ota-fetch/ota-fetch.conf"
 CURRENT_MANIFEST="$CURRENT_DIR/manifest.json"
 BASE_MANIFEST="$SERVER_ROOT/manifest_base.json"
 DAEMON_LOG="$LOG_DIR/ota_fetch_daemon.log"
@@ -199,7 +199,7 @@ update_interval_sec = 1
 inbox_manifest_dir = $INBOX_DIR
 current_manifest_dir = $CURRENT_DIR
 manifest_ca_cert = $TRUST_DIR/manifest-ca-chain.pem
-log_file = $LOG_DIR/ota_fetch.log
+log_file = $LOG_DIR/ota-fetch.log
 EOF
 
 echo "Starting local HTTPS (mTLS) test server on port $PORT"
