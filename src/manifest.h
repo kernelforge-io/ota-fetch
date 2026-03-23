@@ -77,9 +77,7 @@ manifest_t *manifest_load(const char *path);
 void manifest_free(manifest_t *m);
 
 /**
- * @brief Print manifest fields and values for debugging/logging.
- *
- * Prints top-level fields and each release/file entry.
+ * @brief Log manifest fields and values at DEBUG level.
  *
  * @param m Pointer to manifest_t to print.
  */

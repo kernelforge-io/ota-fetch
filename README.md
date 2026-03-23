@@ -48,10 +48,26 @@ Key modules in `src/`:
 
 - `main.c`: CLI parsing and startup.
 - `config.c`: INI config parsing and validation.
-- `ota-fetch.c`: fetch/verify/apply loop.
+- `ota_fetch.c`: fetch/verify/apply loop.
 - `manifest.c`: manifest parsing and selection.
 - `verify_libcrypto.c`: signature verification (OpenSSL).
 - `hash.c`: SHA-256 helpers.
+- `log.c` / `log.h`: centralized logging and progress output.
+
+## Logging and console output
+
+- Log levels are `ERROR`, `WARN`, `INFO`, and `DEBUG`.
+- Default runtime logging is `INFO`.
+- `--debug` enables `DEBUG` output, including config and manifest dumps.
+- Logs are written to stderr in a simple `[LEVEL] message` format.
+- If `log_file` is set, line-based logs are also appended to that file.
+- Download progress is driven by libcurl's transfer callback and is shown only
+  on stderr.
+- When stderr is a TTY, payload downloads use in-place `[PROGRESS]` updates
+  with percent, bytes transferred, transfer speed, and ETA when the total size
+  is known.
+- When stderr is not a TTY, frequent progress updates are suppressed so daemon
+  logs stay clean and line-oriented.
 
 ## Trust and verification model
 
@@ -160,15 +176,32 @@ Key behavior:
   retry delay is 5 seconds between attempts.
 - `update_interval_sec` is used only in daemon mode (0 uses the built-in
   3600-second default).
-- `log_file` is optional; logs always go to stderr and are also appended to the
-  file when set.
+- `log_file` is optional; line-based logs always go to stderr and are also
+  appended to the file when set.
+- Interactive payload progress is emitted only on stderr; it is not written to
+  `log_file`.
 
 ## Usage
 
 ```bash
 ./ota-fetch --oneshot
 ./ota-fetch --daemon
+./ota-fetch --oneshot --debug
 ./ota-fetch --config=/path/to/ota-fetch.conf
+./ota-fetch enroll --config /path/to/ota-fetch.conf --token-file /path/to/enroll.token
+```
+
+Example stderr output during an update:
+
+```text
+[INFO] Starting ota-fetch (oneshot mode)
+[INFO] Starting update check
+[INFO] Downloading manifest: manifest.json
+[INFO] Manifest verification succeeded
+[INFO] Downloading payload: update.raucb
+[PROGRESS] 42%  28.6 MiB / 68.0 MiB  2.3 MiB/s  ETA 00:17
+[INFO] Payload hash verification succeeded
+[INFO] Starting apply stage
 ```
 
 ## RAUC integration
@@ -204,6 +237,13 @@ Quick start:
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build
 ctest --test-dir build --output-on-failure
+```
+
+Optional local checks:
+
+```bash
+clang-format-18 --dry-run --Werror src/*.c src/*.h tests/*.c tests/*.h
+bash test/scripts/run-fetch-test.sh
 ```
 
 For full local testing details, see `TESTING.md`.

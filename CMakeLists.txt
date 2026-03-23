@@ -36,7 +36,7 @@ add_library(ota_fetch_lib STATIC
     src/manifest.c
     src/verify_libcrypto.c
     src/hash.c
-    src/logging.c
+    src/log.c
 )
 
 target_include_directories(ota_fetch_lib

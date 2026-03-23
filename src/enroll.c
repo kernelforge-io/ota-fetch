@@ -6,9 +6,10 @@
  */
 
 #include "enroll.h"
-#include "logging.h"
+#include "log.h"
 
 #include <cjson/cJSON.h>
+#include <ctype.h>
 #include <curl/curl.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -19,7 +20,6 @@
 #include <openssl/rsa.h>
 #include <openssl/x509.h>
 #include <stdbool.h>
-#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -433,8 +433,8 @@ static int generate_key_and_csr(char **key_pem_out, char **csr_pem_out,
 		goto cleanup;
 	}
 
-	if (PEM_write_bio_PrivateKey(key_bio, pkey, NULL, NULL, 0, NULL, NULL) !=
-	    1) {
+	if (PEM_write_bio_PrivateKey(key_bio, pkey, NULL, NULL, 0, NULL,
+				     NULL) != 1) {
 		goto cleanup;
 	}
 	if (PEM_write_bio_X509_REQ(csr_bio, req) != 1) {
@@ -543,8 +543,7 @@ static int parse_enroll_response(const char *json, char **cert_pem_out) {
 	    chain->valuestring[0] != '\0') {
 		chain_text = chain->valuestring;
 		chain_len = strlen(chain_text);
-		need_newline =
-		    cert_len > 0 && cert_text[cert_len - 1] != '\n';
+		need_newline = cert_len > 0 && cert_text[cert_len - 1] != '\n';
 	}
 
 	total_len = cert_len + chain_len + (need_newline ? 1u : 0u) + 1u;
@@ -609,7 +608,8 @@ static int post_enroll_request(const char *url, const struct ota_config *cfg,
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 	curl_easy_setopt(curl, CURLOPT_POST, 1L);
 	curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request_json);
-	curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)strlen(request_json));
+	curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE,
+			 (long)strlen(request_json));
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &resp);
 	curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
@@ -684,9 +684,8 @@ int ota_fetch_enroll(const struct ota_config *cfg, const char *token_file,
 
 	if (!force && (file_exists(cfg->tls_client_key) ||
 		       file_exists(cfg->tls_client_cert))) {
-		LOG_ERROR(
-		    "Refusing to enroll: identity already exists "
-		    "(use --force to overwrite)");
+		LOG_ERROR("Refusing to enroll: identity already exists "
+			  "(use --force to overwrite)");
 		return -1;
 	}
 

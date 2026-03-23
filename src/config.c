@@ -11,6 +11,7 @@
 
 #include "config.h"
 #include "ini.h"
+#include "log.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,7 +20,7 @@
 
 static int validate_required_string(const char *value, const char *name) {
 	if (!value || value[0] == '\0') {
-		fprintf(stderr, "Config missing required value: %s\n", name);
+		log_error("Config missing required value: %s", name);
 		return -1;
 	}
 	return 0;
@@ -80,7 +81,8 @@ int config_load(const char *filename, struct ota_config *config) {
 
 	if (validate_required_string(config->server_url,
 				     "network.server_url") != 0 ||
-	    validate_required_string(config->tls_ca_cert, "network.tls_ca_cert") != 0 ||
+	    validate_required_string(config->tls_ca_cert,
+				     "network.tls_ca_cert") != 0 ||
 	    validate_required_string(config->tls_client_cert,
 				     "network.tls_client_cert") != 0 ||
 	    validate_required_string(config->tls_client_key,
@@ -114,32 +116,34 @@ void config_free(struct ota_config *config) {
 
 /* ------------------------------------------------------------------------ */
 void config_print(const struct ota_config *config) {
-	printf("Config:\n");
-	printf("server_url          = %s\n",
-	       config->server_url ? config->server_url : "(null)");
-	printf("enroll_url          = %s\n",
-	       config->enroll_url ? config->enroll_url : "(null)");
-	printf("tls_ca_cert             = %s\n",
-	       config->tls_ca_cert ? config->tls_ca_cert : "(null)");
-	printf("tls_client_cert         = %s\n",
-	       config->tls_client_cert ? config->tls_client_cert : "(null)");
-	printf("tls_client_key          = %s\n",
-	       config->tls_client_key ? config->tls_client_key : "(null)");
-	printf("connect_timeout     = %d\n", config->connect_timeout);
-	printf("transfer_timeout    = %d\n", config->transfer_timeout);
-	printf("low_speed_limit     = %d\n", config->low_speed_limit);
-	printf("low_speed_time      = %d\n", config->low_speed_time);
-	printf("retry_attempts      = %d\n", config->retry_attempts);
-	printf("update_interval_sec = %d\n", config->update_interval_sec);
-	printf("inbox_manifest_dir  = %s\n",
-	       config->inbox_manifest_dir ? config->inbox_manifest_dir : "(null)");
-	printf("current_manifest_dir= %s\n",
-	       config->current_manifest_dir ? config->current_manifest_dir
-					     : "(null)");
-	printf("manifest_ca_cert        = %s\n",
-	       config->manifest_ca_cert ? config->manifest_ca_cert : "(null)");
-	printf("log_file            = %s\n",
-	       config->log_file ? config->log_file : "(null)");
-	printf("device_id           = %s\n",
-	       config->device_id ? config->device_id : "(null)");
+	log_debug("Config:");
+	log_debug("server_url           = %s",
+		  config->server_url ? config->server_url : "(null)");
+	log_debug("enroll_url           = %s",
+		  config->enroll_url ? config->enroll_url : "(null)");
+	log_debug("tls_ca_cert          = %s",
+		  config->tls_ca_cert ? config->tls_ca_cert : "(null)");
+	log_debug("tls_client_cert      = %s",
+		  config->tls_client_cert ? config->tls_client_cert : "(null)");
+	log_debug("tls_client_key       = %s",
+		  config->tls_client_key ? config->tls_client_key : "(null)");
+	log_debug("connect_timeout      = %d", config->connect_timeout);
+	log_debug("transfer_timeout     = %d", config->transfer_timeout);
+	log_debug("low_speed_limit      = %d", config->low_speed_limit);
+	log_debug("low_speed_time       = %d", config->low_speed_time);
+	log_debug("retry_attempts       = %d", config->retry_attempts);
+	log_debug("update_interval_sec  = %d", config->update_interval_sec);
+	log_debug("inbox_manifest_dir   = %s", config->inbox_manifest_dir
+						   ? config->inbox_manifest_dir
+						   : "(null)");
+	log_debug("current_manifest_dir = %s",
+		  config->current_manifest_dir ? config->current_manifest_dir
+					       : "(null)");
+	log_debug("manifest_ca_cert     = %s", config->manifest_ca_cert
+						   ? config->manifest_ca_cert
+						   : "(null)");
+	log_debug("log_file             = %s",
+		  config->log_file ? config->log_file : "(null)");
+	log_debug("device_id            = %s",
+		  config->device_id ? config->device_id : "(null)");
 }

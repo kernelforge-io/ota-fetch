@@ -20,7 +20,7 @@
 
 #include "ota_fetch.h"
 #include "hash.h"
-#include "logging.h"
+#include "log.h"
 #include "manifest.h"
 #include "verify_libcrypto.h"
 #include <curl/curl.h>
@@ -34,6 +34,7 @@
 #include <sys/reboot.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 
 /**
@@ -73,14 +74,6 @@ static void handle_termination_signal(int sig) {
 }
 
 /**
- * @brief In-memory data buffer for HTTP(S) downloads.
- */
-struct memory_buffer {
-	char *data;
-	size_t size;
-};
-
-/**
  * @brief Result codes for file equality checks.
  */
 typedef enum {
@@ -90,28 +83,148 @@ typedef enum {
 } files_equal_result_t;
 
 /**
- * @brief libcurl write callback for in-memory downloads.
- *
- * @param contents Data pointer from libcurl.
- * @param size     Size of each item.
- * @param nmemb    Number of items.
- * @param userp    User data pointer (memory_buffer).
- * @return Number of bytes written.
+ * @brief Streaming download progress state for libcurl callbacks.
  */
-static size_t write_callback(void *contents, size_t size, size_t nmemb,
-			     void *userp) {
-	size_t total_size = size * nmemb;
-	struct memory_buffer *mem = (struct memory_buffer *)userp;
+struct download_progress {
+	int64_t started_ms;
+	int64_t last_emit_ms;
+	int last_percent;
+	uint64_t transferred;
+	uint64_t total;
+};
 
-	char *ptr = realloc(mem->data, mem->size + total_size + 1);
-	if (!ptr)
+static int64_t monotonic_ms(void) {
+	struct timespec ts;
+
+	if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) {
 		return 0;
+	}
 
-	mem->data = ptr;
-	memcpy(&(mem->data[mem->size]), contents, total_size);
-	mem->size += total_size;
-	mem->data[mem->size] = 0;
-	return total_size;
+	return ((int64_t)ts.tv_sec * 1000LL) + (ts.tv_nsec / 1000000LL);
+}
+
+static size_t file_write_callback(void *contents, size_t size, size_t nmemb,
+				  void *userp) {
+	FILE *fp = (FILE *)userp;
+	size_t total_size = size * nmemb;
+
+	if (!fp || total_size == 0) {
+		return 0;
+	}
+
+	return fwrite(contents, 1, total_size, fp);
+}
+
+static void download_progress_init(struct download_progress *progress) {
+	if (!progress) {
+		return;
+	}
+
+	memset(progress, 0, sizeof(*progress));
+	progress->started_ms = monotonic_ms();
+	progress->last_emit_ms = -1;
+	progress->last_percent = -1;
+}
+
+static int download_progress_percent(uint64_t transferred, uint64_t total) {
+	uint64_t percent;
+
+	if (total == 0) {
+		return -1;
+	}
+
+	percent = (transferred * 100u) / total;
+	if (percent > 100u) {
+		percent = 100u;
+	}
+
+	return (int)percent;
+}
+
+static double
+download_progress_speed(const struct download_progress *progress) {
+	int64_t elapsed_ms;
+
+	if (!progress || progress->transferred == 0 ||
+	    progress->started_ms <= 0) {
+		return 0.0;
+	}
+
+	elapsed_ms = monotonic_ms() - progress->started_ms;
+	if (elapsed_ms <= 0) {
+		return 0.0;
+	}
+
+	return ((double)progress->transferred * 1000.0) / (double)elapsed_ms;
+}
+
+static void download_progress_render(const struct download_progress *progress,
+				     bool final_line) {
+	char line[128];
+	uint64_t total;
+
+	if (!progress || !log_progress_enabled() ||
+	    progress->transferred == 0) {
+		return;
+	}
+
+	total = progress->total;
+	if (final_line && total == 0) {
+		total = progress->transferred;
+	}
+
+	if (log_format_progress_line(line, sizeof(line), progress->transferred,
+				     total,
+				     download_progress_speed(progress)) != 0) {
+		return;
+	}
+
+	if (final_line) {
+		log_progress_finish(line);
+	} else {
+		log_progress_update(line);
+	}
+}
+
+static int download_progress_callback(void *clientp, curl_off_t dltotal,
+				      curl_off_t dlnow, curl_off_t ultotal,
+				      curl_off_t ulnow) {
+	struct download_progress *progress = (struct download_progress *)
+	    clientp;
+	int64_t now_ms;
+	int current_percent;
+
+	(void)ultotal;
+	(void)ulnow;
+
+	if (!progress) {
+		return 0;
+	}
+
+	progress->total = dltotal > 0 ? (uint64_t)dltotal : 0;
+	progress->transferred = dlnow > 0 ? (uint64_t)dlnow : 0;
+
+	if (!log_progress_enabled() || progress->transferred == 0) {
+		return 0;
+	}
+
+	if (progress->total > 0 && progress->transferred >= progress->total) {
+		return 0;
+	}
+
+	now_ms = monotonic_ms();
+	current_percent = download_progress_percent(progress->transferred,
+						    progress->total);
+	if (!log_progress_should_emit(now_ms, progress->last_emit_ms,
+				      progress->last_percent, current_percent,
+				      false)) {
+		return 0;
+	}
+
+	progress->last_emit_ms = now_ms;
+	progress->last_percent = current_percent;
+	download_progress_render(progress, false);
+	return 0;
 }
 
 /**
@@ -220,10 +333,10 @@ static files_equal_result_t files_equal(const char *path1, const char *path2) {
 		return FILES_ERR;
 	}
 
-	LOG_INFO("file1 =%s, hash1 =%s, ret =%d", path1, sha256_hex(hash1),
-		 irethash1);
-	LOG_INFO("file2 =%s, hash2 =%s, ret =%d", path2, sha256_hex(hash2),
-		 irethash2);
+	log_debug("file1=%s hash1=%s ret=%d", path1, sha256_hex(hash1),
+		  irethash1);
+	log_debug("file2=%s hash2=%s ret=%d", path2, sha256_hex(hash2),
+		  irethash2);
 
 	return (memcmp(hash1, hash2, SHA256_DIGEST_LEN) == 0) ? FILES_EQ
 							      : FILES_NEQ;
@@ -248,22 +361,75 @@ static int file_exists(const char *path) {
  * @param cfg       OTA config (includes certs/keys).
  * @return 0 on success, -1 on error.
  */
-static int fetch_file(const char *url, const char *dest_path,
-		      const struct ota_config *cfg) {
-	int rc = -1;
-	long http_code = 0;
-	CURL *curl = curl_easy_init();
-	char *tmp_path = NULL;
-	struct memory_buffer buf = {0};
+static int ensure_parent_dir_exists(const char *dest_path) {
+	char dir[PATH_MAX];
+	char *slash = NULL;
 
-	if (!curl) {
-		LOG_ERROR("Failed to initialize libcurl");
+	if (!dest_path) {
+		errno = EINVAL;
 		return -1;
 	}
 
+	strncpy(dir, dest_path, sizeof(dir));
+	dir[sizeof(dir) - 1] = '\0';
+
+	slash = strrchr(dir, '/');
+	if (!slash) {
+		return 0;
+	}
+
+	*slash = '\0';
+	if (dir[0] == '\0') {
+		return 0;
+	}
+
+	return mkdir_p(dir, 0755);
+}
+
+static int fetch_file(const char *url, const char *dest_path,
+		      const struct ota_config *cfg, bool show_progress) {
+	int rc = -1;
+	long http_code = 0;
+	CURLcode res;
+	CURL *curl = NULL;
+	char *tmp_path = NULL;
+	FILE *fp = NULL;
+	bool progress_enabled = false;
+	struct download_progress progress;
+
+	if (ensure_parent_dir_exists(dest_path) != 0) {
+		log_error("Failed to create directory for %s: %s", dest_path,
+			  strerror(errno));
+		return -1;
+	}
+
+	size_t tmp_len = strlen(dest_path) + 5;
+	tmp_path = malloc(tmp_len);
+	if (!tmp_path) {
+		log_error("Failed to allocate temp path");
+		return -1;
+	}
+	snprintf(tmp_path, tmp_len, "%s.tmp", dest_path);
+
+	fp = fopen(tmp_path, "wb");
+	if (!fp) {
+		log_error("Failed to open %s: %s", tmp_path, strerror(errno));
+		goto cleanup;
+	}
+
+	curl = curl_easy_init();
+
+	if (!curl) {
+		log_error("Failed to initialize libcurl");
+		goto cleanup;
+	}
+
+	progress_enabled = show_progress && log_progress_enabled();
+	download_progress_init(&progress);
+
 	curl_easy_setopt(curl, CURLOPT_URL, url);
-	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
-	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &buf);
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, file_write_callback);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
 	curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 	curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
 
@@ -282,79 +448,69 @@ static int fetch_file(const char *url, const char *dest_path,
 	curl_easy_setopt(curl, CURLOPT_SSLKEY, cfg->tls_client_key);
 	curl_easy_setopt(curl, CURLOPT_CAINFO, cfg->tls_ca_cert);
 
-	CURLcode res = curl_easy_perform(curl);
+	if (progress_enabled) {
+		curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION,
+				 download_progress_callback);
+		curl_easy_setopt(curl, CURLOPT_XFERINFODATA, &progress);
+		curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
+	}
+
+	res = curl_easy_perform(curl);
 	curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
 	if (res != CURLE_OK) {
 		if (http_code >= 400) {
-			LOG_ERROR("HTTP error fetching %s: %ld", url,
+			log_error("HTTP error fetching %s: %ld", url,
 				  http_code);
 		} else {
-			LOG_ERROR("curl error fetching %s: %s", url,
+			log_error("curl error fetching %s: %s", url,
 				  curl_easy_strerror(res));
 		}
 
 		long verify_result = 0;
 		curl_easy_getinfo(curl, CURLINFO_SSL_VERIFYRESULT,
 				  &verify_result);
-		LOG_ERROR("SSL verify result: %ld", verify_result);
+		log_error("SSL verify result: %ld", verify_result);
 		goto cleanup;
 	}
 
 	if (http_code < 200 || http_code >= 300) {
-		LOG_ERROR("HTTP error fetching %s: %ld", url, http_code);
+		log_error("HTTP error fetching %s: %ld", url, http_code);
 		goto cleanup;
 	}
 
-	// Ensure directory exists
-	char dir[PATH_MAX];
-	strncpy(dir, dest_path, sizeof(dir));
-	dir[sizeof(dir) - 1] = '\0';
-	char *slash = strrchr(dir, '/');
-	if (slash) {
-		*slash = '\0';
-		if (mkdir_p(dir, 0755) != 0) {
-			LOG_ERROR("Failed to create directory: %s",
-				  strerror(errno));
-		}
-	}
-
-	size_t tmp_len = strlen(dest_path) + 5;
-	tmp_path = malloc(tmp_len);
-	if (!tmp_path) {
-		LOG_ERROR("Failed to allocate temp path");
-		goto cleanup;
-	}
-	snprintf(tmp_path, tmp_len, "%s.tmp", dest_path);
-
-	FILE *fp = fopen(tmp_path, "wb");
-	if (!fp) {
-		LOG_ERROR("Failed to write %s: %s", tmp_path, strerror(errno));
+	if (fflush(fp) != 0) {
+		log_error("Failed to flush %s: %s", tmp_path, strerror(errno));
 		goto cleanup;
 	}
 
-	if (fwrite(buf.data, 1, buf.size, fp) != buf.size) {
-		LOG_ERROR("Short write to %s: %s", tmp_path, strerror(errno));
-		fclose(fp);
+	if (fclose(fp) != 0) {
+		fp = NULL;
+		log_error("Failed to close %s: %s", tmp_path, strerror(errno));
 		goto cleanup;
 	}
-	fclose(fp);
+	fp = NULL;
 
 	if (rename(tmp_path, dest_path) != 0) {
-		LOG_ERROR("Failed to move %s to %s: %s", tmp_path, dest_path,
+		log_error("Failed to move %s to %s: %s", tmp_path, dest_path,
 			  strerror(errno));
 		goto cleanup;
 	}
 
-	LOG_INFO("%s saved to: %s", url, dest_path);
+	if (progress_enabled) {
+		download_progress_render(&progress, true);
+	}
+
 	rc = 0;
 
 cleanup:
+	if (fp) {
+		fclose(fp);
+	}
 	if (rc != 0 && tmp_path) {
 		unlink(tmp_path);
 	}
 	free(tmp_path);
 	curl_easy_cleanup(curl);
-	free(buf.data);
 	return rc;
 }
 
@@ -511,26 +667,52 @@ static void ota_inbox_cleanup(ota_ctx_t *ctx) {
  * @return 0 on success, non-zero on error.
  */
 static int fetch_new_manifest(ota_ctx_t *ctx) {
-
 	char *manifest_url = NULL;
 	char *sig_url = NULL;
 	char *cert_url = NULL;
+	int rc1;
+	int rc2;
+	int rc3;
 
 	manifest_url = build_path(ctx->config.server_url, "manifest.json");
 	sig_url = build_path(ctx->config.server_url, "manifest.json.sig");
 	cert_url = build_path(ctx->config.server_url, "signer.crt");
+	if (!manifest_url || !sig_url || !cert_url) {
+		log_error("Failed to build manifest download URLs");
+		free(manifest_url);
+		free(sig_url);
+		free(cert_url);
+		return -1;
+	}
 
-	int rc1 = fetch_file(manifest_url, ctx->inbox_manifest_path,
-			     &ctx->config);
-	int rc2 = fetch_file(sig_url, ctx->inbox_sig_path, &ctx->config);
-	int rc3 = fetch_file(cert_url, ctx->inbox_cert_path, &ctx->config);
+	log_info("Downloading manifest: manifest.json");
+	rc1 = fetch_file(manifest_url, ctx->inbox_manifest_path, &ctx->config,
+			 false);
+	if (rc1 == 0) {
+		log_info("Manifest download completed: %s",
+			 ctx->inbox_manifest_path);
+	}
+
+	log_info("Downloading manifest signature: manifest.json.sig");
+	rc2 = fetch_file(sig_url, ctx->inbox_sig_path, &ctx->config, false);
+	if (rc2 == 0) {
+		log_info("Manifest signature download completed: %s",
+			 ctx->inbox_sig_path);
+	}
+
+	log_info("Downloading signer certificate: signer.crt");
+	rc3 = fetch_file(cert_url, ctx->inbox_cert_path, &ctx->config, false);
+	if (rc3 == 0) {
+		log_info("Signer certificate download completed: %s",
+			 ctx->inbox_cert_path);
+	}
 
 	if (rc1)
-		LOG_ERROR("Failed to fetch manifest.json");
+		log_error("Failed to fetch manifest.json");
 	if (rc2)
-		LOG_ERROR("Failed to fetch manifest.json.sig");
+		log_error("Failed to fetch manifest.json.sig");
 	if (rc3)
-		LOG_ERROR("Failed to fetch signer.crt");
+		log_error("Failed to fetch signer.crt");
 
 	if (manifest_url != NULL) {
 		free(manifest_url);
@@ -558,12 +740,10 @@ static int validate_new_manifest(ota_ctx_t *ctx) {
 	    ctx->config.manifest_ca_cert, errbuf, sizeof(errbuf));
 
 	if (vres != VERIFY_OK) {
-		LOG_ERROR("Manifest signature validation "
-			  "failed: %s",
-			  errbuf);
+		log_error("Manifest verification failed: %s", errbuf);
 		return -1;
 	}
-	LOG_INFO("Manifest signature validation OK.");
+	log_info("Manifest verification succeeded");
 	return 0;
 }
 
@@ -576,22 +756,22 @@ static int validate_new_manifest(ota_ctx_t *ctx) {
 static files_equal_result_t compare_manifests(ota_ctx_t *ctx) {
 
 	if (!file_exists(ctx->current_manifest_path)) {
-		LOG_WARN("No current manifest found: Update required");
+		log_info("Update available: no current manifest found");
 		return FILES_NEQ;
 	}
 	if (!file_exists(ctx->inbox_manifest_path)) {
-		LOG_ERROR("No inbox manifest to compare: Aborting");
+		log_error("No inbox manifest to compare");
 		return FILES_ERR;
 	}
 
 	files_equal_result_t ret = files_equal(ctx->current_manifest_path,
 					       ctx->inbox_manifest_path);
 	if (ret == FILES_EQ) {
-		LOG_INFO("Manifest matches: System up to date");
+		log_info("System already up to date");
 	} else if (ret == FILES_NEQ) {
-		LOG_INFO("Manifest mismatch: Update required");
+		log_info("Update available: manifest changed");
 	} else {
-		LOG_ERROR("Error comparing manifests");
+		log_error("Failed to compare current and new manifests");
 	}
 
 	return ret;
@@ -607,7 +787,7 @@ static int make_new_manifest_current(ota_ctx_t *ctx) {
 
 	// Ensure destination directory exists
 	if (mkdir_p(ctx->config.current_manifest_dir, 0755) != 0) {
-		LOG_ERROR("Failed to create directory: %s", strerror(errno));
+		log_error("Failed to create directory: %s", strerror(errno));
 	}
 
 	// Remove existing destination file, if any
@@ -615,13 +795,13 @@ static int make_new_manifest_current(ota_ctx_t *ctx) {
 
 	// Move (rename) the file
 	if (rename(ctx->inbox_manifest_path, ctx->current_manifest_path) != 0) {
-		LOG_ERROR("Failed to move manifest from %s to %s: %s",
+		log_error("Failed to move manifest from %s to %s: %s",
 			  ctx->inbox_manifest_path, ctx->current_manifest_path,
 			  strerror(errno));
 		return -1;
 	}
 
-	LOG_INFO("Moved manifest: %s → %s", ctx->inbox_manifest_path,
+	log_info("Updated current manifest: %s -> %s", ctx->inbox_manifest_path,
 		 ctx->current_manifest_path);
 	return 0;
 }
@@ -640,21 +820,22 @@ static int fetch_release(ota_ctx_t *ctx) {
 					       ctx->config.device_id);
 
 	if (ctx->release == NULL) {
-		LOG_ERROR("Release not found");
+		log_error("No release found for device %s",
+			  ctx->config.device_id ? ctx->config.device_id
+						: "(default)");
 		return -1;
 	}
 
 	if (ctx->release->files_count == 0 || !ctx->release->files) {
-		LOG_ERROR("Release contains no files");
+		log_error("Selected release contains no files");
 		return -1;
 	}
 
 	file = &ctx->release->files[0];
 	if (!file->filename || !file->path || !file->sha256 ||
 	    !file->file_type) {
-		LOG_ERROR(
-		    "Release file entry missing required fields "
-		    "(file_type, filename, path, sha256)");
+		log_error("Release file entry missing required fields "
+			  "(file_type, filename, path, sha256)");
 		return -1;
 	}
 
@@ -664,22 +845,33 @@ static int fetch_release(ota_ctx_t *ctx) {
 		free(ctx->payload_path);
 		ctx->payload_path = NULL;
 	}
-	ctx->payload_path =
-	    build_path(ctx->config.inbox_manifest_dir, file->filename);
+	ctx->payload_path = build_path(ctx->config.inbox_manifest_dir,
+				       file->filename);
+	if (ctx->payload_path == NULL) {
+		log_error("Failed to allocate payload path");
+		return -1;
+	}
 
 	char *payload_url = NULL;
 	payload_url = build_path(ctx->config.server_url, file->path);
 
 	if (payload_url == NULL) {
-		LOG_ERROR("Failed to assemble release payload URL");
+		log_error("Failed to assemble release payload URL");
 		return -1;
 	}
 
-	// Fetch payload from URL provided in manifest
-	ret = fetch_file(payload_url, ctx->payload_path, &ctx->config);
+	log_info("Update selected: %s %s",
+		 ctx->release->release_name ? ctx->release->release_name
+					    : "(unnamed release)",
+		 ctx->release->release_version ? ctx->release->release_version
+					       : "(unknown version)");
+	log_info("Downloading payload: %s", file->filename);
+	ret = fetch_file(payload_url, ctx->payload_path, &ctx->config, true);
 
 	if (ret != 0) {
-		LOG_ERROR("Release payload download failed");
+		log_error("Payload download failed");
+	} else {
+		log_info("Payload download completed: %s", ctx->payload_path);
 	}
 
 	free(payload_url);
@@ -695,9 +887,8 @@ static int fetch_release(ota_ctx_t *ctx) {
  */
 static int validate_release(ota_ctx_t *ctx) {
 	if (!ctx->release || !ctx->release->files ||
-	    ctx->release->files_count == 0 ||
-	    !ctx->release->files[0].sha256) {
-		LOG_ERROR("Release file hash missing from manifest");
+	    ctx->release->files_count == 0 || !ctx->release->files[0].sha256) {
+		log_error("Release file hash missing from manifest");
 		return -1;
 	}
 
@@ -707,25 +898,25 @@ static int validate_release(ota_ctx_t *ctx) {
 
 	rc = sha256sum_file(ctx->payload_path, hash);
 	if (rc != SHA256SUM_OK) {
-		LOG_ERROR("Failed to hash payload %s: %d", ctx->payload_path,
+		log_error("Failed to hash payload %s: %d", ctx->payload_path,
 			  rc);
 		return -1;
 	}
 
 	if (hex_encode(hash_string, sizeof(hash_string), hash,
 		       SHA256_DIGEST_LEN) != 0) {
-		LOG_ERROR("Failed to format payload SHA256");
+		log_error("Failed to format payload SHA256");
 		return -1;
 	}
 
 	if (strcmp(hash_string, ctx->release->files[0].sha256) != 0) {
-		LOG_ERROR("SHA256 mismatch");
-		LOG_ERROR("Expected: %s", ctx->release->files[0].sha256);
-		LOG_ERROR("Actual:   %s", hash_string);
+		log_error("Payload hash verification failed");
+		log_error("Expected: %s", ctx->release->files[0].sha256);
+		log_error("Actual:   %s", hash_string);
 		return -1;
 	}
 
-	LOG_INFO("Payload SHA256 validated successfully.");
+	log_info("Payload hash verification succeeded");
 	return 0;
 }
 
@@ -738,23 +929,26 @@ static int validate_release(ota_ctx_t *ctx) {
  * @return 0 on success, non-zero on error.
  */
 static int apply_release(ota_ctx_t *ctx) {
-	LOG_INFO("Applying release payload");
+	log_info("Starting apply stage");
 
 	if (!ctx->release || !ctx->release->files ||
 	    ctx->release->files_count == 0 ||
 	    !ctx->release->files[0].file_type) {
-		LOG_ERROR("Release file_type missing from manifest");
+		log_error("Release file_type missing from manifest");
 		return -1;
 	}
 
 	const char *file_type = ctx->release->files[0].file_type;
 
 	if (strcmp(file_type, "rauc_bundle_test") == 0) {
-		LOG_INFO("Simulating RAUC bundle update for testing");
-		make_new_manifest_current(ctx);
+		log_info("Simulating RAUC bundle apply for testing");
+		if (make_new_manifest_current(ctx) != 0) {
+			log_error("Failed to update current manifest");
+			return -1;
+		}
 
 	} else if (strcmp(file_type, "rauc_bundle") == 0) {
-		LOG_INFO("Installing RAUC bundle");
+		log_info("Handing payload to RAUC");
 
 		const char *bundle_path = ctx->payload_path;
 		char *const argv[] = {"rauc", "install", (char *)bundle_path,
@@ -764,55 +958,56 @@ static int apply_release(ota_ctx_t *ctx) {
 		if (pid == 0) {
 			// Child process
 			execvp("rauc", argv);
-			perror("execvp failed");
+			log_error("execvp failed: %s", strerror(errno));
 			_exit(1);
 		} else if (pid > 0) {
 			// Parent process
 			int status;
 			if (waitpid(pid, &status, 0) < 0) {
-				LOG_ERROR("waitpid failed: %s",
+				log_error("waitpid failed: %s",
 					  strerror(errno));
 				return -1;
 			}
 			if (WIFEXITED(status)) {
 				int exit_status = WEXITSTATUS(status);
 				if (exit_status != 0) {
-					LOG_ERROR("RAUC install failed with "
+					log_error("RAUC install failed with "
 						  "exit status %d",
 						  exit_status);
 					return -1;
 				}
 			} else if (WIFSIGNALED(status)) {
-				LOG_ERROR(
+				log_error(
 				    "RAUC install terminated by signal %d",
 				    WTERMSIG(status));
 				return -1;
 			} else {
-				LOG_ERROR("RAUC install ended unexpectedly");
+				log_error("RAUC install ended unexpectedly");
 				return -1;
 			}
 		} else {
 			// Fork failed
-			perror("fork failed");
+			log_error("fork failed: %s", strerror(errno));
 			return -1;
 		}
 
-		LOG_INFO("RAUC install succeeded");
+		log_info("RAUC install succeeded");
 
 		if (make_new_manifest_current(ctx) != 0) {
-			LOG_ERROR("Failed to update current manifest");
+			log_error("Failed to update current manifest");
 			return 1;
 		}
 
-		LOG_INFO("Rebooting system...");
+		log_info("Rebooting system");
 		sync();
 		reboot(RB_AUTOBOOT); // or system("reboot")
 
 	} else {
-		LOG_ERROR("Unsupported update type: %s", file_type);
+		log_error("Unsupported update type: %s", file_type);
 		return 1;
 	}
 
+	log_info("Apply stage completed successfully");
 	return 0;
 }
 
@@ -834,6 +1029,7 @@ int ota_fetch_run(bool daemon_mode, const struct ota_config *cfg) {
 	sigaction(SIGINT, &sa, NULL);
 
 	while (1) {
+		log_info("Starting update check");
 		rc = ota_ctx_init(&ctx, cfg);
 		if (rc != 0)
 			goto attempt_end;
@@ -851,7 +1047,7 @@ int ota_fetch_run(bool daemon_mode, const struct ota_config *cfg) {
 		files_equal_result_t cmp_rc = compare_manifests(&ctx);
 		if (cmp_rc == FILES_EQ) {
 			if (!daemon_mode) {
-				// System up to date + one-shot, return
+				log_info("Update check completed successfully");
 				ota_ctx_free(&ctx);
 				return 0;
 			}
@@ -865,7 +1061,7 @@ int ota_fetch_run(bool daemon_mode, const struct ota_config *cfg) {
 
 		ctx.inbox_manifest = manifest_load(ctx.inbox_manifest_path);
 		if (ctx.inbox_manifest == NULL) {
-			LOG_ERROR("Failed to load new manifest");
+			log_error("Failed to load downloaded manifest");
 			rc = -1;
 			goto attempt_end;
 		}
@@ -880,7 +1076,7 @@ int ota_fetch_run(bool daemon_mode, const struct ota_config *cfg) {
 
 		rc = apply_release(&ctx);
 		if ((rc == 0) && (!daemon_mode)) {
-			// Update applied + one-shot, return
+			log_info("OTA update completed successfully");
 			ota_ctx_free(&ctx);
 			return rc;
 		}
@@ -890,12 +1086,20 @@ int ota_fetch_run(bool daemon_mode, const struct ota_config *cfg) {
 			attempt++;
 		ota_ctx_free(&ctx);
 
+		if (rc != 0) {
+			log_error("Update check failed");
+		}
+
 		if (daemon_mode) {
 			// daemon mode
 			sleep(fetch_interval_sec);
 		} else {
 			// one-shot mode
 			if (attempt < cfg->retry_attempts) {
+				log_warn("Retrying update check in %d seconds "
+					 "(%d/%d)",
+					 RETRY_DELAY, attempt,
+					 cfg->retry_attempts);
 				sleep(RETRY_DELAY);
 			} else {
 				return rc;
