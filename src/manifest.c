@@ -9,6 +9,7 @@
  */
 
 #include "manifest.h"
+#include "log.h"
 
 #include <cjson/cJSON.h>
 #include <inttypes.h>
@@ -232,40 +233,40 @@ void manifest_print(const manifest_t *m) {
 	if (!m)
 		return;
 
-	printf("Manifest:\n");
-	printf("  manifest_version: %s\n",
-	       m->manifest_version ? m->manifest_version : "(null)");
-	printf("  created:          %s\n", m->created ? m->created : "(null)");
-	printf("  releases_count:   %zu\n", m->releases_count);
+	log_debug("Manifest:");
+	log_debug("  manifest_version: %s",
+		  m->manifest_version ? m->manifest_version : "(null)");
+	log_debug("  created:          %s", m->created ? m->created : "(null)");
+	log_debug("  releases_count:   %zu", m->releases_count);
 
 	for (size_t i = 0; i < m->releases_count; i++) {
 		const manifest_release_t *r = &m->releases[i];
 		if (!r)
 			continue;
 
-		printf("  Release[%zu]:\n", i);
-		printf("    device_id:       %s\n",
-		       r->device_id ? r->device_id : "(null)");
-		printf("    release_name:    %s\n",
-		       r->release_name ? r->release_name : "(null)");
-		printf("    release_version: %s\n",
-		       r->release_version ? r->release_version : "(null)");
-		printf("    created:         %s\n",
-		       r->created ? r->created : "(null)");
-		printf("    files_count:     %zu\n", r->files_count);
+		log_debug("  Release[%zu]:", i);
+		log_debug("    device_id:       %s",
+			  r->device_id ? r->device_id : "(null)");
+		log_debug("    release_name:    %s",
+			  r->release_name ? r->release_name : "(null)");
+		log_debug("    release_version: %s",
+			  r->release_version ? r->release_version : "(null)");
+		log_debug("    created:         %s",
+			  r->created ? r->created : "(null)");
+		log_debug("    files_count:     %zu", r->files_count);
 
 		for (size_t k = 0; k < r->files_count; k++) {
 			const manifest_file_t *f = &r->files[k];
-			printf("    File[%zu]:\n", k);
-			printf("      file_type: %s\n",
-			       f->file_type ? f->file_type : "(null)");
-			printf("      filename:  %s\n",
-			       f->filename ? f->filename : "(null)");
-			printf("      path:      %s\n",
-			       f->path ? f->path : "(null)");
-			printf("      sha256:    %s\n",
-			       f->sha256 ? f->sha256 : "(null)");
-			printf("      size:      %" PRIu64 "\n", f->size);
+			log_debug("    File[%zu]:", k);
+			log_debug("      file_type: %s",
+				  f->file_type ? f->file_type : "(null)");
+			log_debug("      filename:  %s",
+				  f->filename ? f->filename : "(null)");
+			log_debug("      path:      %s",
+				  f->path ? f->path : "(null)");
+			log_debug("      sha256:    %s",
+				  f->sha256 ? f->sha256 : "(null)");
+			log_debug("      size:      %" PRIu64, f->size);
 		}
 	}
 }

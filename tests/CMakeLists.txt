@@ -19,6 +19,7 @@ endfunction()
 add_ota_fetch_test(test_config test_config.c)
 add_ota_fetch_test(test_manifest test_manifest.c)
 add_ota_fetch_test(test_hash test_hash.c)
+add_ota_fetch_test(test_log test_log.c)
 
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
 set(ENROLL_CTEST_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/scripts/enroll_ctest.py")

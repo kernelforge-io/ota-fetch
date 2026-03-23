@@ -6,7 +6,7 @@
  */
 
 #include "hash.h"
-#include "logging.h"
+#include "log.h"
 
 #include <errno.h>
 #include <openssl/err.h>
@@ -117,8 +117,8 @@ const char *sha256_hex(const uint8_t digest[SHA256_DIGEST_LEN]) {
 	if (!digest)
 		return "(null)";
 
-	/* Use Thread local storage when available;
-	 * Fall back to a single static buffer. */
+		/* Use Thread local storage when available;
+		 * Fall back to a single static buffer. */
 #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L)
 	enum { RING_SLOTS = 4 };
 	static _Thread_local char ring[RING_SLOTS][SHA256_DIGEST_LEN * 2 + 1];

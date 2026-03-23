@@ -35,7 +35,8 @@
 struct ota_config {
 	/**< OTA server base URL (e.g., "https://updates.example.com") */
 	char *server_url;
-	/**< Optional enrollment endpoint (defaults to server_url + "/enroll") */
+	/**< Optional enrollment endpoint (defaults to server_url + "/enroll")
+	 */
 	char *enroll_url;
 	/**< Path to CA certificate for TLS validation */
 	char *tls_ca_cert;
@@ -88,9 +89,7 @@ int config_load(const char *filename, struct ota_config *config);
 void config_free(struct ota_config *config);
 
 /**
- * @brief Print OTA config for debugging/logging.
- *
- * Outputs all fields and values to stdout for human inspection.
+ * @brief Log OTA config fields at DEBUG level.
  *
  * @param config Pointer to ota_config struct to print.
  */

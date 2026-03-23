@@ -28,7 +28,7 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#include "logging.h"
+#include "log.h"
 
 #define SIG_MAX_LEN (16u * 1024u)
 #define SIG_ED25519_LEN 64u
@@ -127,63 +127,60 @@ static const char *friendly_key_type_name(EVP_PKEY *pkey, char *tmp,
 		return "Ed25519";
 	case EVP_PKEY_EC:
 #if OPENSSL_VERSION_NUMBER >= 0x30000000L
-		{
-			char group_name[80];
-			size_t group_len = 0;
-			const char *curve_name = NULL;
+	{
+		char group_name[80];
+		size_t group_len = 0;
+		const char *curve_name = NULL;
 
-			if (EVP_PKEY_get_utf8_string_param(
-				pkey, OSSL_PKEY_PARAM_GROUP_NAME,
-				group_name, sizeof(group_name),
-				&group_len) != 1)
-				return "ECDSA";
+		if (EVP_PKEY_get_utf8_string_param(
+			pkey, OSSL_PKEY_PARAM_GROUP_NAME, group_name,
+			sizeof(group_name), &group_len) != 1)
+			return "ECDSA";
 
-			if (group_len >= sizeof(group_name))
-				group_name[sizeof(group_name) - 1] = '\0';
-			else
-				group_name[group_len] = '\0';
+		if (group_len >= sizeof(group_name))
+			group_name[sizeof(group_name) - 1] = '\0';
+		else
+			group_name[group_len] = '\0';
 
-			curve_name = group_name;
-			if (strcmp(group_name, "prime256v1") == 0 ||
-			    strcmp(group_name, "secp256r1") == 0)
-				curve_name = "P-256";
+		curve_name = group_name;
+		if (strcmp(group_name, "prime256v1") == 0 ||
+		    strcmp(group_name, "secp256r1") == 0)
+			curve_name = "P-256";
 
-			if (!curve_name || !tmp || tmp_len == 0)
-				return "ECDSA";
-			written = snprintf(tmp, tmp_len, "ECDSA %s",
-					   curve_name);
-			if (written < 0 || (size_t)written >= tmp_len)
-				return "ECDSA";
-			return tmp;
-		}
+		if (!curve_name || !tmp || tmp_len == 0)
+			return "ECDSA";
+		written = snprintf(tmp, tmp_len, "ECDSA %s", curve_name);
+		if (written < 0 || (size_t)written >= tmp_len)
+			return "ECDSA";
+		return tmp;
+	}
 #else
-		{
-			const EC_KEY *ec_key = NULL;
-			const EC_GROUP *ec_group = NULL;
-			const char *curve_name = NULL;
-			int curve_nid;
+	{
+		const EC_KEY *ec_key = NULL;
+		const EC_GROUP *ec_group = NULL;
+		const char *curve_name = NULL;
+		int curve_nid;
 
-			ec_key = EVP_PKEY_get0_EC_KEY(pkey);
-			if (!ec_key)
-				return "ECDSA";
-			ec_group = EC_KEY_get0_group(ec_key);
-			if (!ec_group)
-				return "ECDSA";
-			curve_nid = EC_GROUP_get_curve_name(ec_group);
-			if (curve_nid == NID_undef)
-				return "ECDSA";
-			if (curve_nid == NID_X9_62_prime256v1)
-				curve_name = "P-256";
-			else
-				curve_name = OBJ_nid2sn(curve_nid);
-			if (!curve_name || !tmp || tmp_len == 0)
-				return "ECDSA";
-			written = snprintf(tmp, tmp_len, "ECDSA %s",
-					   curve_name);
-			if (written < 0 || (size_t)written >= tmp_len)
-				return "ECDSA";
-			return tmp;
-		}
+		ec_key = EVP_PKEY_get0_EC_KEY(pkey);
+		if (!ec_key)
+			return "ECDSA";
+		ec_group = EC_KEY_get0_group(ec_key);
+		if (!ec_group)
+			return "ECDSA";
+		curve_nid = EC_GROUP_get_curve_name(ec_group);
+		if (curve_nid == NID_undef)
+			return "ECDSA";
+		if (curve_nid == NID_X9_62_prime256v1)
+			curve_name = "P-256";
+		else
+			curve_name = OBJ_nid2sn(curve_nid);
+		if (!curve_name || !tmp || tmp_len == 0)
+			return "ECDSA";
+		written = snprintf(tmp, tmp_len, "ECDSA %s", curve_name);
+		if (written < 0 || (size_t)written >= tmp_len)
+			return "ECDSA";
+		return tmp;
+	}
 #endif
 	case EVP_PKEY_RSA:
 		return "RSA";
@@ -558,20 +555,19 @@ static verify_result_t verify_ed25519_signature(
 		goto cleanup;
 	}
 
-	int verify_rc =
-	    EVP_DigestVerify(mdctx, sigbuf, siglen, data_buf, data_len);
+	int verify_rc = EVP_DigestVerify(mdctx, sigbuf, siglen, data_buf,
+					 data_len);
 	if (verify_rc == 1) {
 		result = VERIFY_OK;
 	} else if (verify_rc == 0) {
-		set_errbuf(
-		    errbuf, errbuf_len,
-		    "Signature invalid (key type %s, sig len %zu)", key_name,
-		    siglen);
+		set_errbuf(errbuf, errbuf_len,
+			   "Signature invalid (key type %s, sig len %zu)",
+			   key_name, siglen);
 		result = VERIFY_ERR_SIG_VERIFY;
 	} else {
-		set_errbuf_openssl(
-		    errbuf, errbuf_len,
-		    "Signature verification error (key type %s)", key_name);
+		set_errbuf_openssl(errbuf, errbuf_len,
+				   "Signature verification error (key type %s)",
+				   key_name);
 		result = VERIFY_ERR_SIG_VERIFY;
 	}
 
@@ -642,15 +638,14 @@ static verify_result_t verify_rsa_ecdsa_signature(
 	if (verify_rc == 1) {
 		result = VERIFY_OK;
 	} else if (verify_rc == 0) {
-		set_errbuf(
-		    errbuf, errbuf_len,
-		    "Signature invalid (key type %s, sig len %zu)", key_name,
-		    siglen);
+		set_errbuf(errbuf, errbuf_len,
+			   "Signature invalid (key type %s, sig len %zu)",
+			   key_name, siglen);
 		result = VERIFY_ERR_SIG_VERIFY;
 	} else {
-		set_errbuf_openssl(
-		    errbuf, errbuf_len,
-		    "Signature verification error (key type %s)", key_name);
+		set_errbuf_openssl(errbuf, errbuf_len,
+				   "Signature verification error (key type %s)",
+				   key_name);
 		result = VERIFY_ERR_SIG_VERIFY;
 	}
 
@@ -710,7 +705,7 @@ verify_result_t verify_signature_with_cert(const char *data_path,
 	openssl_key_name = OBJ_nid2sn(key_type);
 	if (!openssl_key_name)
 		openssl_key_name = "unknown";
-	LOG_INFO("Signer key type: %s", key_name);
+	LOG_DEBUG("Signer key type: %s", key_name);
 	LOG_DEBUG("Signer key type (OpenSSL): %s", openssl_key_name);
 
 	result = read_signature_file(sig_path, &sigbuf, &siglen, errbuf,
