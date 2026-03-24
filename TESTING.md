@@ -34,7 +34,8 @@ ctest --test-dir build --output-on-failure
 ```
 
 The default CTest suite covers config parsing, manifest parsing, SHA-256
-helpers, logging/progress formatting helpers, and the enrollment flow.
+helpers, logging/progress formatting helpers, real TTY progress output,
+non-TTY milestone progress output, and the enrollment flow.
 
 ## Test Discovery and Targeted Runs
 

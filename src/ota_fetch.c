@@ -48,6 +48,7 @@
  * @brief Number of seconds to wait before retrying a failed fetch.
  */
 #define RETRY_DELAY 5
+#define LOG_PROGRESS_NONTTY_BYTE_INTERVAL (5ULL * 1024ULL * 1024ULL)
 
 /**
  * @brief OTA context state.
@@ -89,6 +90,8 @@ struct download_progress {
 	int64_t started_ms;
 	int64_t last_emit_ms;
 	int last_percent;
+	int last_non_tty_percent_milestone;
+	uint64_t last_non_tty_byte_milestone;
 	uint64_t transferred;
 	uint64_t total;
 };
@@ -124,6 +127,7 @@ static void download_progress_init(struct download_progress *progress) {
 	progress->started_ms = monotonic_ms();
 	progress->last_emit_ms = -1;
 	progress->last_percent = -1;
+	progress->last_non_tty_percent_milestone = -1;
 }
 
 static int download_progress_percent(uint64_t transferred, uint64_t total) {
@@ -193,6 +197,8 @@ static int download_progress_callback(void *clientp, curl_off_t dltotal,
 	    clientp;
 	int64_t now_ms;
 	int current_percent;
+	int current_percent_milestone;
+	uint64_t current_byte_milestone;
 
 	(void)ultotal;
 	(void)ulnow;
@@ -209,6 +215,38 @@ static int download_progress_callback(void *clientp, curl_off_t dltotal,
 	}
 
 	if (progress->total > 0 && progress->transferred >= progress->total) {
+		return 0;
+	}
+
+	if (!isatty(fileno(stderr))) {
+		if (progress->total > 0) {
+			current_percent = download_progress_percent(
+			    progress->transferred, progress->total);
+			current_percent_milestone =
+			    log_progress_percent_milestone(current_percent);
+			if (current_percent_milestone < 0 ||
+			    current_percent_milestone ==
+				progress->last_non_tty_percent_milestone) {
+				return 0;
+			}
+
+			progress->last_non_tty_percent_milestone =
+			    current_percent_milestone;
+		} else {
+			current_byte_milestone = log_progress_byte_milestone(
+			    progress->transferred,
+			    LOG_PROGRESS_NONTTY_BYTE_INTERVAL);
+			if (current_byte_milestone == 0 ||
+			    current_byte_milestone ==
+				progress->last_non_tty_byte_milestone) {
+				return 0;
+			}
+
+			progress->last_non_tty_byte_milestone =
+			    current_byte_milestone;
+		}
+
+		download_progress_render(progress, false);
 		return 0;
 	}
 

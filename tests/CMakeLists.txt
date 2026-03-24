@@ -24,7 +24,10 @@ add_ota_fetch_test(test_log test_log.c)
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
 set(ENROLL_CTEST_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/scripts/enroll_ctest.py")
 set(ENROLL_CTEST_WORK_DIR "${CMAKE_CURRENT_BINARY_DIR}/enroll_ctest")
+set(PROGRESS_CTEST_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/scripts/progress_ctest.py")
+set(PROGRESS_CTEST_WORK_DIR "${CMAKE_CURRENT_BINARY_DIR}/progress_ctest")
 file(MAKE_DIRECTORY "${ENROLL_CTEST_WORK_DIR}")
+file(MAKE_DIRECTORY "${PROGRESS_CTEST_WORK_DIR}")
 
 add_test(
     NAME enroll_success_writes_identity_and_deletes_token
@@ -60,4 +63,28 @@ add_test(
             ${ENROLL_CTEST_WORK_DIR}
             --case
             force_overwrite
+)
+
+add_test(
+    NAME progress_tty_reports_payload_download
+    COMMAND ${Python3_EXECUTABLE}
+            ${PROGRESS_CTEST_SCRIPT}
+            --ota-fetch
+            $<TARGET_FILE:ota-fetch>
+            --work-root
+            ${PROGRESS_CTEST_WORK_DIR}
+            --case
+            tty_progress
+)
+
+add_test(
+    NAME progress_non_tty_reports_milestones
+    COMMAND ${Python3_EXECUTABLE}
+            ${PROGRESS_CTEST_SCRIPT}
+            --ota-fetch
+            $<TARGET_FILE:ota-fetch>
+            --work-root
+            ${PROGRESS_CTEST_WORK_DIR}
+            --case
+            non_tty_milestones
 )

@@ -50,6 +50,9 @@ void log_progress_clear(void);
 
 int log_format_bytes(char *buf, size_t buf_sz, uint64_t bytes);
 int log_format_eta(char *buf, size_t buf_sz, uint64_t seconds);
+int log_progress_percent_milestone(int percent);
+uint64_t log_progress_byte_milestone(uint64_t transferred,
+				     uint64_t interval_bytes);
 bool log_progress_should_emit(int64_t now_ms, int64_t last_emit_ms,
 			      int previous_percent, int current_percent,
 			      bool completed);

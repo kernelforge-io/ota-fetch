@@ -15,6 +15,7 @@
 
 #define LOG_PROGRESS_PERCENT_INTERVAL_MS 200
 #define LOG_PROGRESS_FORCE_INTERVAL_MS 500
+#define LOG_PROGRESS_MIN_PERCENT_MILESTONE 10
 
 static FILE *g_log_fp = NULL;
 static int g_log_level = LOG_LEVEL;
@@ -42,8 +43,12 @@ static void log_reset_progress_state(void) {
 static void log_render_progress(const char *message, bool final_line) {
 	size_t printed_width;
 
-	if (!message || !log_stderr_is_tty() ||
-	    !log_is_enabled(LOG_LEVEL_INFO)) {
+	if (!message || !log_is_enabled(LOG_LEVEL_INFO)) {
+		return;
+	}
+
+	if (!log_stderr_is_tty()) {
+		log_render_line(stderr, "PROGRESS", message);
 		return;
 	}
 
@@ -183,9 +188,7 @@ void log_close(void) {
 	g_log_fp = NULL;
 }
 
-bool log_progress_enabled(void) {
-	return log_is_enabled(LOG_LEVEL_INFO) && log_stderr_is_tty();
-}
+bool log_progress_enabled(void) { return log_is_enabled(LOG_LEVEL_INFO); }
 
 void log_progress_update(const char *message) {
 	log_render_progress(message, false);
@@ -256,6 +259,27 @@ int log_format_eta(char *buf, size_t buf_sz, uint64_t seconds) {
 	}
 
 	return snprintf(buf, buf_sz, "%02" PRIu64 ":%02" PRIu64, minutes, secs);
+}
+
+int log_progress_percent_milestone(int percent) {
+	if (percent < LOG_PROGRESS_MIN_PERCENT_MILESTONE) {
+		return -1;
+	}
+
+	if (percent >= 100) {
+		return 100;
+	}
+
+	return (percent / 10) * 10;
+}
+
+uint64_t log_progress_byte_milestone(uint64_t transferred,
+				     uint64_t interval_bytes) {
+	if (interval_bytes == 0) {
+		return 0;
+	}
+
+	return transferred / interval_bytes;
 }
 
 bool log_progress_should_emit(int64_t now_ms, int64_t last_emit_ms,
