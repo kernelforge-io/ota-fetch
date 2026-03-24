@@ -24,6 +24,16 @@ int main(void) {
 	TEST_ASSERT(log_format_eta(buf, sizeof(buf), 3723u) > 0);
 	TEST_ASSERT_STR_EQ("01:02:03", buf);
 
+	TEST_ASSERT_INT_EQ(-1, log_progress_percent_milestone(9));
+	TEST_ASSERT_INT_EQ(10, log_progress_percent_milestone(10));
+	TEST_ASSERT_INT_EQ(40, log_progress_percent_milestone(49));
+	TEST_ASSERT_INT_EQ(100, log_progress_percent_milestone(100));
+
+	TEST_ASSERT_INT_EQ(0, (int)log_progress_byte_milestone(0u, 1024u));
+	TEST_ASSERT_INT_EQ(0, (int)log_progress_byte_milestone(1023u, 1024u));
+	TEST_ASSERT_INT_EQ(1, (int)log_progress_byte_milestone(1024u, 1024u));
+	TEST_ASSERT_INT_EQ(3, (int)log_progress_byte_milestone(3072u, 1024u));
+
 	TEST_ASSERT(log_progress_should_emit(1000, -1, -1, 0, false));
 	TEST_ASSERT(!log_progress_should_emit(1100, 1000, 10, 11, false));
 	TEST_ASSERT(log_progress_should_emit(1250, 1000, 10, 11, false));

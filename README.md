@@ -66,8 +66,9 @@ Key modules in `src/`:
 - When stderr is a TTY, payload downloads use in-place `[PROGRESS]` updates
   with percent, bytes transferred, transfer speed, and ETA when the total size
   is known.
-- When stderr is not a TTY, frequent progress updates are suppressed so daemon
-  logs stay clean and line-oriented.
+- When stderr is not a TTY, payload downloads emit conservative line-based
+  `[PROGRESS]` milestones so service logs and `journalctl` still show download
+  advancement without becoming noisy.
 
 ## Trust and verification model
 
@@ -178,8 +179,7 @@ Key behavior:
   3600-second default).
 - `log_file` is optional; line-based logs always go to stderr and are also
   appended to the file when set.
-- Interactive payload progress is emitted only on stderr; it is not written to
-  `log_file`.
+- Progress output is emitted only on stderr; it is not written to `log_file`.
 
 ## Usage
 
