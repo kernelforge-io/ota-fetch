@@ -434,31 +434,14 @@ static int fetch_file(const char *url, const char *dest_path,
 	FILE *fp = NULL;
 	bool progress_enabled = false;
 	struct download_progress progress;
+	size_t tmp_len;
 
 	if (ensure_parent_dir_exists(dest_path) != 0) {
 		log_error("Failed to create directory for %s: %s", dest_path,
 			  strerror(errno));
 		return -1;
 	}
-	snprintf(tmp_path, tmp_len, "%s.tmp", dest_path);
-
-	fp = fopen(tmp_path, "wb");
-	if (!fp) {
-		log_error("Failed to open %s: %s", tmp_path, strerror(errno));
-		goto cleanup;
-	}
-
-	curl = curl_easy_init();
-
-	if (!curl) {
-		log_error("Failed to initialize libcurl");
-		goto cleanup;
-	}
-
-	progress_enabled = show_progress && log_progress_enabled();
-	download_progress_init(&progress);
-
-	size_t tmp_len = strlen(dest_path) + 5;
+	tmp_len = strlen(dest_path) + 5;
 	tmp_path = malloc(tmp_len);
 	if (!tmp_path) {
 		log_error("Failed to allocate temp path");
